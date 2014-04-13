@@ -92,7 +92,7 @@ h1.title {
     font-size: 45px;
     line-height: 25px;
     font-weight: bold;
-    color: rgba(189, 98, 224, 0.78);
+    color: rgba(000, 205, 000, 0.9);
     z-index: 100;
     -webkit-animation: move-up 500ms ease-in;
     -moz-animation: move-up 500ms ease-in;
