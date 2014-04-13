@@ -27,7 +27,8 @@ var DIRECTION = {
 var AUDIO = {
   move: 'move',
   win: 'win',
-  loose: 'loose'
+  loose: 'loose',
+  '100': '100'
 };
 
 var app = {
@@ -216,12 +217,15 @@ GameManager.prototype.move = function(direction) {
 
           // Update the score
           self.score += merged.value;
-          audioManager.play('move');
 
           // The mighty 2048 tile
           if (merged.value >= 2048) {
             audioManager.play('win');
             self.won = true;
+          } else if (merged.value > 100) {
+             audioManager.play('100');
+          } else {
+            audioManager.play('move');
           }
         } else {
           self.moveTile(tile, positions.farthest);
