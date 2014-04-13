@@ -5,5 +5,8 @@
 profile
 # iOS
 platforms/
+<<<<<<< HEAD
 hooks/
+=======
+>>>>>>> eb3cadd21a6464f81bf5b1e6e175030551ddfd0a
 plugins/
