@@ -24,6 +24,12 @@ var DIRECTION = {
   LEFT: 'left'
 };
 
+var AUDIO = {
+  move: 'move',
+  win: 'win',
+  loose: 'loose'
+};
+
 var app = {
   // Application Constructor
   initialize: function() {
@@ -42,33 +48,60 @@ var app = {
   // function, we must explicity call 'app.receivedEvent(...);'
   onDeviceReady: function() {
     window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-                                    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-    window.requestAnimationFrame(function () {
-        var manager = new GameManager(4, InputManager, HTMLActuator);
+      window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+    window.requestAnimationFrame(function() {
+      var manager = new GameManager(4, InputManager, HTMLActuator, AudioManager);
     });
   }
 };
 
-// Play audio
-//
-function playAudio(url) {
-    // Play the audio file at url
-    var my_media = new Media(url,
-        // success callback
-        function() {
-        },
-        // error callback
-        function(err) {
-    });
+function AudioManager() {
+  this._sounds = {};
 
-    // Play audio
-    my_media.play();
+  this.initilize();
 }
 
-function GameManager(size, InputManager, Actuator) {
-  this.size         = size; // Size of the grid
+AudioManager.prototype.initilize = function() {
+  var self = this;
+
+  _.each(AUDIO, function(name) {
+      var url = 'audio/' + name + '.mp3';
+      if (typeof Media === 'undefined') {
+        Media = function() {
+          return {
+            play: function(name) {
+              console.log(name);
+            }
+          };
+        };
+      }
+      var media = new Media(url,
+        // success callback
+        function() {},
+        // error callback
+        function(err) {}
+      );
+
+      if (!self._sounds[name]) {
+        self._sounds[name] = media;
+      }
+  });
+};
+
+AudioManager.prototype.play = function(name) {
+  var self = this;
+  var media = self._sounds[name];
+
+  if (media) {
+    media.play();
+  }
+};
+
+function GameManager(size, InputManager, Actuator, AudioManager) {
+  this.size = size; // Size of the grid
   this.inputManager = new InputManager();
-  this.actuator     = new Actuator();
+  this.actuator = new Actuator();
+  this.audioManager = new AudioManager();
 
   this.startTiles = 2;
 
@@ -144,6 +177,7 @@ GameManager.prototype.moveTile = function(tile, cell) {
 GameManager.prototype.move = function(direction) {
   // 0: up, 1: right, 2:down, 3: left
   var self = this;
+  var audioManager = this.audioManager;
 
   if (this.over || this.won) return; // Don't do anything if the game's over
 
@@ -182,9 +216,13 @@ GameManager.prototype.move = function(direction) {
 
           // Update the score
           self.score += merged.value;
+          audioManager.play('move');
 
           // The mighty 2048 tile
-          if (merged.value === 2048) self.won = true;
+          if (merged.value >= 2048) {
+            audioManager.play('win');
+            self.won = true;
+          }
         } else {
           self.moveTile(tile, positions.farthest);
         }
@@ -200,6 +238,7 @@ GameManager.prototype.move = function(direction) {
     this.addRandomTile();
 
     if (!this.movesAvailable()) {
+      audioManager.play('loose');
       this.over = true; // Game over!
     }
 
@@ -407,7 +446,7 @@ Grid.prototype.withinBounds = function(position) {
 function HTMLActuator() {
   this.tileContainer = $(".tile-container")[0];
   this.scoreContainer = $(".score-container")[0];
-  this.messageContainer = $(".game-message")[0];
+  this.messageContainer = $(".game-message");
 
   this.score = 0;
 }
@@ -510,7 +549,6 @@ HTMLActuator.prototype.updateScore = function(score) {
   this.scoreContainer.textContent = this.score;
 
   if (difference > 0) {
-    playAudio('audio/move.mp3');
     var addition = document.createElement("div");
     addition.classList.add("score-addition");
     addition.textContent = "+" + difference;
@@ -525,16 +563,18 @@ HTMLActuator.prototype.message = function(won) {
 
   // if (ga) ga("send", "event", "game", "end", type, this.score);
 
-  this.messageContainer.classList.add(type);
-  this.messageContainer.getElementsByTagName("p")[0].textContent = message;
+  this.messageContainer.addClass(type);
+  this.messageContainer.children("p").text(message);
+  this.messageContainer.show();
 };
 
 HTMLActuator.prototype.clearMessage = function() {
-  this.messageContainer.classList.remove("game-won", "game-over");
+  this.messageContainer.removeClass("game-won", "game-over");
+  this.messageContainer.hide();
 };
 
 function InputManager() {
-  this.events         = {};
+  this.events = {};
   this.listen();
 }
 
@@ -557,21 +597,6 @@ InputManager.prototype.emit = function(event, data) {
 InputManager.prototype.listen = function() {
   var self = this;
 
-  // document.addEventListener("keydown", function(event) {
-  //   var modifiers = event.altKey || event.ctrlKey || event.metaKey ||
-  //     event.shiftKey;
-  //   var mapped = map[event.which];
-
-  //   if (!modifiers) {
-  //     if (mapped !== undefined) {
-  //       event.preventDefault();
-  //       self.emit("move", mapped);
-  //     }
-
-  //     if (event.which === 32) self.restart.bind(self)(event);
-  //   }
-  // });
-
   var retry = $(".retry-button");
   retry.bind("click", this.restart.bind(this));
 
@@ -579,16 +604,16 @@ InputManager.prototype.listen = function() {
   var gestures = [DIRECTION.UP, DIRECTION.RIGHT, DIRECTION.DOWN, DIRECTION.LEFT];
 
   var gameContainer = $(".game-container");
-  gameContainer.swipe( {
+  gameContainer.swipe({
     //Generic swipe handler for all directions
-    swipe:function(event, direction, distance, duration, fingerCount) {
+    swipe: function(event, direction, distance, duration, fingerCount) {
       event.preventDefault();
 
       var mapped = gestures.indexOf(direction);
       if (mapped !== -1) self.emit("move", mapped);
     },
     //Default is 75px, set to 0 for demo so any distance triggers swipe
-    threshold:20
+    threshold: 20
   });
 };
 
@@ -598,19 +623,22 @@ InputManager.prototype.restart = function(event) {
 };
 
 function Tile(position, value) {
-  this.x                = position.x;
-  this.y                = position.y;
-  this.value            = value || 2;
+  this.x = position.x;
+  this.y = position.y;
+  this.value = value || 2;
 
   this.previousPosition = null;
-  this.mergedFrom       = null; // Tracks tiles that merged together
+  this.mergedFrom = null; // Tracks tiles that merged together
 }
 
-Tile.prototype.savePosition = function () {
-  this.previousPosition = { x: this.x, y: this.y };
+Tile.prototype.savePosition = function() {
+  this.previousPosition = {
+    x: this.x,
+    y: this.y
+  };
 };
 
-Tile.prototype.updatePosition = function (position) {
+Tile.prototype.updatePosition = function(position) {
   this.x = position.x;
   this.y = position.y;
 };
